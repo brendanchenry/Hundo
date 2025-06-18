@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantasy Football Data Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .settings-btn {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #2d3748;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .settings-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .settings-panel {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .settings-panel h3 {
+            margin-bottom: 15px;
+            color: #2d3748;
+        }
+
+        .setting-item {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .setting-item label {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .setting-item input {
+            flex: 1;
+            min-width: 200px;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+
+        .setting-item button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .setting-item button:first-of-type {
+            background: #667eea;
+            color: white;
+        }
+
+        .danger-btn {
+            background: #e53e3e !important;
+            color: white !important;
+        }
+
+        .api-key-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .api-key-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .api-key-content h3 {
+            margin-bottom: 15px;
+            color: #2d3748;
+        }
+
+        .api-key-content input {
+            width: 100%;
+            padding: 12px;
+            margin: 15px 0;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+
+        .api-key-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .api-key-buttons button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .api-key-buttons button:first-child {
+            background: #667eea;
+            color: white;
+        }
+
+        .api-key-buttons button:last-child {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        .api-key-note {
+            font-size: 0.9rem;
+            color: #718096;
+            margin-top: 15px;
+        }
+
+        .api-key-note a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 1.1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-card h3 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            border: 2px solid #e2e8f0;
+            border-radius: 15px;
+            overflow: hidden;
+            background: white;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 12px;
+            max-width: 80%;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-left: auto;
+        }
+
+        .ai-message {
+            background: white;
+            color: #2d3748;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .message strong {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .chat-input input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .chat-input button {
+            margin-left: 10px;
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+
+        .chat-input button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .chat-input button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .sample-questions {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f0f4f8;
+            border-radius: 15px;
+        }
+
+        .sample-questions h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .sample-questions ul {
+            list-style: none;
+        }
+
+        .sample-questions li {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 4px solid #667eea;
+        }
+
+        .sample-questions li:hover {
+            background: #667eea;
+            color: white;
+            transform: translateX(5px);
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #718096;
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e2e8f0;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            border-left: 4px solid #e53e3e;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+            
+            .chat-container {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏈 Fantasy Football Analyzer</h1>
+            <p>Ask questions about your league's historical data using Claude AI</p>
+            <button class="settings-btn" onclick="toggleSettings()">⚙️ Settings</button>
+        </div>
+
+        <div class="settings-panel" id="settingsPanel" style="display: none;">
+            <h3>🔧 Settings</h3>
+            <div class="setting-item">
+                <label>Update Claude API Key:</label>
+                <input type="password" id="newApiKey" placeholder="sk-ant-..." />
+                <button onclick="updateAPIKey()">Update</button>
+                <button onclick="clearAPIKey()" class="danger-btn">Clear</button>
+            </div>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+            <!-- Stats will be populated here -->
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message ai-message">
+                    <strong>AI Assistant</strong>
+                    <div>Hello! I'm here to help you analyze your fantasy football data. You can ask me questions about player performance, team records, draft positions, trades, and much more. What would you like to know?</div>
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="userInput" placeholder="Ask about your fantasy football data..." />
+                <button onclick="sendMessage()" id="sendButton">Send</button>
+            </div>
+        </div>
+
+        <div class="sample-questions">
+            <h3>💡 Sample Questions</h3>
+            <ul>
+                <li onclick="askQuestion('Who has the most championship wins?')">Who has the most championship wins?</li>
+                <li onclick="askQuestion('What is Carr\\'s best season record?')">What is Carr's best season record?</li>
+                <li onclick="askQuestion('Who scores the most points on average?')">Who scores the most points on average?</li>
+                <li onclick="askQuestion('Which draft position wins the most?')">Which draft position wins the most?</li>
+                <li onclick="askQuestion('Who makes the most trades per season?')">Who makes the most trades per season?</li>
+                <li onclick="askQuestion('Show me the 2018 season standings')">Show me the 2018 season standings</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let fantasyData = [];
+        let isLoading = false;
+
+        // Sample CSV data (in a real app, this would be loaded from your file)
+        const csvData = `Player,Team Name,Wins,Losses,Points for,Points Against,Draft Position,Year,Finish ,Moves,Trades
+Brendan,3rd and Shlong,6,7,1279.36,1355.68,6,2011,8,22,1
+Geraghty,Bros Like This Team,5,8,1251.66,1352.68,1,2011,9,19,1
+Finn,CPU-Know!,7,6,1251.02,1216.16,4,2011,4,58,0
+DA,Game is Aubrey HOT,10,3,1491.52,1227.06,5,2011,2,53,0
+Pheil,Pheil Cabinets,6,7,1375.8,1370.2,2,2011,6,18,0
+Cinalli,Prob a Waste of $$,9,4,1496.44,1346.88,3,2011,1,18,2
+Aubrey,Sean T's Hitstick,7,6,1294.7,1272.56,8,2011,5,38,0
+Bonk,Sean T's Men,6,7,1346.28,1351.64,7,2011,3,31,0
+Carr,Smack'd N D Mouf,6,7,1260.64,1380.66,10,2011,7,24,1
+Klinker,Sorry...OopsRakpo,3,10,1189.82,1363.72,9,2011,10,20,1
+Brendan,3rd and Shlong,8,5,1370.8,1261.84,6,2010,6,17,1
+Geraghty,Bros Like This Team,5,8,1180.42,1336.28,10,2010,9,13,0
+Finn,Malcolm K All da WAY,5,8,1247.66,1276.94,5,2010,8,33,0
+DA,Game is Aubrey HOT,8,5,1349.76,1323.2,1,2010,2,46,1
+Bryan,KB Loves Dudes,6,7,1197.78,1284.24,7,2010,5,13,0
+Cinalli,Prob a Waste of $$,2,11,1216.86,1444.54,2,2010,10,12,0
+Aubrey,Sean T's Hitstick,4,9,1218.52,1241.92,9,2010,7,32,0
+Bonk,Sean T's Men,9,4,1443.24,1310.24,3,2010,3,19,0
+Carr,Smack'd N D Mouf,9,4,1324,1199.56,8,2010,1,41,0
+Klinker,Sorry...Oops,9,4,1384.26,1254.54,4,2010,4,40,0
+Carr,Gurley's Gone Wild,8,5,1630.2,1454.62,1,2018,1,55,1
+Brendan,BigCashRusty,8,5,1639.6,1447.7,11,2018,3,33,2
+Klinker,Due Theory,8,5,1753.96,1489.32,7,2018,2,36,0
+DA,Little Giants,8,5,1526.16,1507.56,10,2018,6,31,0
+Bonk,Bonk the Donk!,4,9,1415.26,1594.22,4,2018,,49,1
+Wang,Wang Chung Tonight,8,5,1478.8,1519.32,9,2018,5,24,0
+Cinalli,Prob a Waste of $$,5,8,1508.2,1521.78,5,2018,,27,0
+Geraghty,Surrogates,8,5,1542.02,1486.96,8,2018,4,19,0
+Aubrey,The Big Silly,5,8,1591.74,1587.04,2,2018,,37,0
+Bobbin,The Cisco Disco,6,7,1408.04,1530.8,6,2018,,48,0
+Finn,The Finn-stigators,5,8,1357.26,1563.98,12,2018,12,33,0
+Z,WORLD WAR Z,5,8,1481.98,1629.92,3,2018,,12,0
+Brendan,BigCashRusty,9,5,1638.12,1595.24,12,2021,1,44,0
+DA,Little Giants,8,6,1558.12,1586.46,11,2021,2,55,0
+Carr,Dakstreet's Back,7,7,1628.56,1684.98,8,2021,3,60,0
+Bonk,Big Bonk T,10,4,1608.42,1526.08,5,2021,4,60,3
+Finn,The Finnstigators,8,6,1698.74,1464,6,2021,5,23,1
+Rob,Chubb Rock,8,6,1454.76,1508.7,3,2021,6,17,1`;
+
+        // Initialize the app
+        function initializeApp() {
+            loadFantasyData();
+            generateStats();
+            
+            // Check for API key
+            if (!checkAPIKey()) {
+                showAPIKeySetup();
+            }
+            
+            // Add enter key support
+            document.getElementById('userInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !isLoading) {
+                    sendMessage();
+                }
+            });
+        }
+
+        function loadFantasyData() {
+            Papa.parse(csvData, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    fantasyData = results.data;
+                    console.log('Fantasy data loaded:', fantasyData.length, 'records');
+                }
+            });
+        }
+
+        function generateStats() {
+            if (fantasyData.length === 0) return;
+
+            const totalSeasons = _.uniq(fantasyData.map(row => row.Year)).length;
+            const totalPlayers = _.uniq(fantasyData.map(row => row.Player)).length;
+            const totalGames = fantasyData.length;
+            const avgPointsPerGame = _.mean(fantasyData.map(row => row['Points for'])).toFixed(1);
+
+            const statsHtml = `
+                <div class="stat-card">
+                    <h3>${totalSeasons}</h3>
+                    <p>Seasons</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${totalPlayers}</h3>
+                    <p>Players</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${totalGames}</h3>
+                    <p>Total Games</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${avgPointsPerGame}</h3>
+                    <p>Avg Points/Game</p>
+                </div>
+            `;
+            
+            document.getElementById('statsGrid').innerHTML = statsHtml;
+        }
+
+        function askQuestion(question) {
+            document.getElementById('userInput').value = question;
+            sendMessage();
+        }
+
+        function sendMessage() {
+            const userInput = document.getElementById('userInput');
+            const question = userInput.value.trim();
+            
+            if (!question || isLoading) return;
+
+            // Add user message
+            addMessage('user', question);
+            userInput.value = '';
+            
+            // Process the question
+            processQuestion(question);
+        }
+
+        function addMessage(type, content) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            
+            const sender = type === 'user' ? 'You' : 'AI Assistant';
+            messageDiv.innerHTML = `
+                <strong>${sender}</strong>
+                <div>${content}</div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addLoadingMessage() {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ai-message';
+            messageDiv.id = 'loadingMessage';
+            messageDiv.innerHTML = `
+                <strong>AI Assistant</strong>
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <span>Analyzing your data...</span>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function removeLoadingMessage() {
+            const loadingMessage = document.getElementById('loadingMessage');
+            if (loadingMessage) {
+                loadingMessage.remove();
+            }
+        }
+
+        async function processQuestion(question) {
+            isLoading = true;
+            document.getElementById('sendButton').disabled = true;
+            
+            addLoadingMessage();
+            
+            try {
+                const answer = await queryClaudeAPI(question);
+                removeLoadingMessage();
+                addMessage('ai', answer);
+            } catch (error) {
+                removeLoadingMessage();
+                console.error('Error querying Claude:', error);
+                addMessage('ai', 'Sorry, I encountered an error connecting to Claude. Please check your API key and try again.');
+            }
+            
+            isLoading = false;
+            document.getElementById('sendButton').disabled = false;
+        }
+
+        // Claude API Configuration
+        let CLAUDE_API_KEY = '';
+        
+        // Show API key setup on first load
+        function checkAPIKey() {
+            const savedKey = localStorage.getItem('claude_api_key');
+            if (savedKey) {
+                CLAUDE_API_KEY = savedKey;
+                return true;
+            }
+            return false;
+        }
+
+        function showAPIKeySetup() {
+            const apiKeyModal = document.createElement('div');
+            apiKeyModal.className = 'api-key-modal';
+            apiKeyModal.innerHTML = `
+                <div class="api-key-content">
+                    <h3>🔑 Setup Claude API Key</h3>
+                    <p>Enter your Claude API key to start analyzing your fantasy football data:</p>
+                    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+                    <div class="api-key-buttons">
+                        <button onclick="saveAPIKey()">Save & Continue</button>
+                        <button onclick="useDemo()">Use Demo Mode</button>
+                    </div>
+                    <p class="api-key-note">
+                        Get your API key from <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+                    </p>
+                </div>
+            `;
+            document.body.appendChild(apiKeyModal);
+        }
+
+        function saveAPIKey() {
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            if (apiKey) {
+                CLAUDE_API_KEY = apiKey;
+                localStorage.setItem('claude_api_key', apiKey);
+                document.querySelector('.api-key-modal').remove();
+            } else {
+                alert('Please enter a valid API key');
+            }
+        }
+
+        function useDemo() {
+            document.querySelector('.api-key-modal').remove();
+            addMessage('ai', '🎮 Demo Mode Active - Using local analysis instead of Claude API. For full AI capabilities, add your Claude API key using the settings button.');
+        }
+
+        async function queryClaudeAPI(question) {
+            if (!CLAUDE_API_KEY) {
+                return analyzeQuestion(question); // Fallback to local analysis
+            }
+
+            const dataContext = `Here is fantasy football data from a league spanning multiple years:
+
+Headers: ${Object.keys(fantasyData[0] || {}).join(', ')}
+Total records: ${fantasyData.length}
+
+Sample data:
+${fantasyData.slice(0, 10).map(row => 
+    Object.values(row).join(',')
+).join('\n')}
+
+Full dataset: ${JSON.stringify(fantasyData, null, 2)}`;
+
+            const prompt = `You are a fantasy football data analyst. Based on the provided fantasy football league data, please answer the following question: "${question}"
+
+Please provide a clear, detailed analysis using the actual data. Format your response in a conversational way, and feel free to include specific statistics, comparisons, and insights. If you mention specific numbers, make sure they're accurate based on the data provided.
+
+${dataContext}`;
+
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': CLAUDE_API_KEY,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: 'claude-3-sonnet-20240229',
+                    max_tokens: 1000,
+                    messages: [{
+                        role: 'user',
+                        content: prompt
+                    }]
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Claude API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.content[0].text;
+        }
+            const lowerQuestion = question.toLowerCase();
+            
+            // Championship/wins analysis
+            if (lowerQuestion.includes('championship') || lowerQuestion.includes('most wins')) {
+                const championships = fantasyData.filter(row => row.Finish === 1);
+                const championshipsByPlayer = _.countBy(championships, 'Player');
+                const topChampion = _.maxBy(Object.entries(championshipsByPlayer), 1);
+                
+                return `Based on the data, **${topChampion[0]}** has the most championships with **${topChampion[1]} wins**. Other champions include: ${Object.entries(championshipsByPlayer).map(([player, wins]) => `${player} (${wins})`).join(', ')}.`;
+            }
+            
+            // Player-specific queries
+            const playerMatch = lowerQuestion.match(/carr|brendan|finn|da|aubrey|cinalli|bonk|geraghty|klinker|wang|bobbin|bryan|rob|amit|pheil|z/i);
+            if (playerMatch) {
+                const playerName = playerMatch[0];
+                const playerData = fantasyData.filter(row => 
+                    row.Player && row.Player.toLowerCase().includes(playerName.toLowerCase())
+                );
+                
+                if (playerData.length > 0) {
+                    const bestSeason = _.maxBy(playerData, 'Wins');
+                    const totalWins = _.sumBy(playerData, 'Wins');
+                    const totalLosses = _.sumBy(playerData, 'Losses');
+                    const avgPoints = _.mean(playerData.map(row => row['Points for'])).toFixed(1);
+                    const championships = playerData.filter(row => row.Finish === 1).length;
+                    
+                    return `**${playerName.charAt(0).toUpperCase() + playerName.slice(1)}** has played ${playerData.length} seasons with a total record of ${totalWins}-${totalLosses}. Best season was ${bestSeason.Year} with ${bestSeason.Wins} wins. Average points per season: ${avgPoints}. Championships: ${championships}.`;
+                }
+            }
+            
+            // Points analysis
+            if (lowerQuestion.includes('points') || lowerQuestion.includes('scoring')) {
+                const avgPointsByPlayer = _.chain(fantasyData)
+                    .groupBy('Player')
+                    .map((games, player) => ({
+                        player,
+                        avgPoints: _.mean(games.map(g => g['Points for'])).toFixed(1)
+                    }))
+                    .sortBy('avgPoints')
+                    .reverse()
+                    .take(5)
+                    .value();
+                
+                return `**Top 5 Average Points Per Season:**\n${avgPointsByPlayer.map((p, i) => `${i+1}. ${p.player}: ${p.avgPoints} pts`).join('\n')}`;
+            }
+            
+            // Draft position analysis
+            if (lowerQuestion.includes('draft')) {
+                const draftAnalysis = _.chain(fantasyData)
+                    .filter(row => row['Draft Position'] && row.Wins)
+                    .groupBy('Draft Position')
+                    .map((games, position) => ({
+                        position: parseInt(position),
+                        avgWins: _.mean(games.map(g => g.Wins)).toFixed(1),
+                        totalSeasons: games.length
+                    }))
+                    .sortBy('avgWins')
+                    .reverse()
+                    .take(5)
+                    .value();
+                
+                return `**Average Wins by Draft Position:**\n${draftAnalysis.map(d => `Position ${d.position}: ${d.avgWins} wins (${d.totalSeasons} seasons)`).join('\n')}`;
+            }
+            
+            // Trades analysis
+            if (lowerQuestion.includes('trade')) {
+                const tradeAnalysis = _.chain(fantasyData)
+                    .filter(row => row.Trades !== undefined)
+                    .groupBy('Player')
+                    .map((games, player) => ({
+                        player,
+                        avgTrades: _.mean(games.map(g => g.Trades)).toFixed(1),
+                        totalTrades: _.sum(games.map(g => g.Trades))
+                    }))
+                    .sortBy('avgTrades')
+                    .reverse()
+                    .take(5)
+                    .value();
+                
+                return `**Most Active Traders:**\n${tradeAnalysis.map(t => `${t.player}: ${t.avgTrades} trades/season (${t.totalTrades} total)`).join('\n')}`;
+            }
+            
+            // Season-specific queries
+            const yearMatch = lowerQuestion.match(/20\d{2}/);
+            if (yearMatch) {
+                const year = parseInt(yearMatch[0]);
+                const seasonData = fantasyData.filter(row => row.Year === year);
+                
+                if (seasonData.length > 0) {
+                    const standings = _.chain(seasonData)
+                        .filter(row => row.Finish)
+                        .sortBy('Finish')
+                        .value();
+                    
+                    return `**${year} Season Standings:**\n${standings.map(s => `${s.Finish}. ${s.Player} (${s.Wins}-${s.Losses}, ${s['Points for']} pts)`).join('\n')}`;
+                }
+            }
+            
+            // Default response with general stats
+            const totalChampionships = fantasyData.filter(row => row.Finish === 1).length;
+            const highestScoringGame = _.maxBy(fantasyData, 'Points for');
+            
+            return `I can help you analyze your fantasy football data! Here are some quick facts: There have been ${totalChampionships} championship seasons recorded. The highest scoring game was ${highestScoringGame['Points for']} points by ${highestScoringGame.Player} in ${highestScoringGame.Year}. Try asking more specific questions about players, seasons, or statistics!`;
+        }
+
+        // Settings functionality
+        function toggleSettings() {
+            const settingsPanel = document.getElementById('settingsPanel');
+            settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function updateAPIKey() {
+            const newKey = document.getElementById('newApiKey').value.trim();
+            if (newKey) {
+                CLAUDE_API_KEY = newKey;
+                localStorage.setItem('claude_api_key', newKey);
+                document.getElementById('newApiKey').value = '';
+                addMessage('ai', 'API key updated successfully! 🎉');
+                toggleSettings();
+            }
+        }
+
+        function clearAPIKey() {
+            CLAUDE_API_KEY = '';
+            localStorage.removeItem('claude_api_key');
+            addMessage('ai', 'API key cleared. Now using demo mode.');
+            toggleSettings();
+        }
+
+        // Initialize the app when the page loads
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>
